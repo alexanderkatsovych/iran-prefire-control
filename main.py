@@ -4,7 +4,7 @@ import json
 import hashlib
 from datetime import datetime, timezone
 
-# --- КОНФИГУРАЦИЯ ЗОН ---
+# --- КОНФИГУРАЦИЯ ---
 REGIONS = {
     'Iran': {'lamin': 24.0, 'lomin': 44.0, 'lamax': 40.0, 'lomax': 63.0},
     'Israel': {'lamin': 29.5, 'lomin': 34.2, 'lamax': 33.3, 'lomax': 35.9},
@@ -48,9 +48,10 @@ def get_news_updates(old_hashes):
             res = requests.get(url, headers=headers, timeout=15)
             h = hashlib.md5(res.text.encode()).hexdigest()
             new_hashes[name] = h
-            updates[name] = "🆕 NEW UPDATE" if old_hashes.get(name) != h else "no updates"
+            status_text = "🆕 NEW UPDATE" if old_hashes.get(name) != h else "no updates"
+            updates[name] = {"status": status_text, "url": url}
         except:
-            updates[name] = "error"
+            updates[name] = {"status": "error", "url": url}
             new_hashes[name] = old_hashes.get(name)
     return updates, new_hashes
 
@@ -73,52 +74,11 @@ if __name__ == "__main__":
         states = r.json().get('states', []) or []
     except: states = []
 
-    civ_count, mil_total = 0, 0
+    civ_count, mil_total, tankers_count = 0, 0, 0
     mil_data = {group: {} for group in MIL_GROUPS}
-    tankers_count = 0
 
     for s in states:
         callsign, lon, lat = (s[1] or "").strip().upper(), s[5], s[6]
         region = get_region(lat, lon)
-        
         is_mil = False
-        for group, tags in MIL_GROUPS.items():
-            if any(t in callsign for t in tags):
-                mil_data[group][region] = mil_data[group].get(region, 0) + 1
-                mil_total += 1
-                is_mil = True
-                if group == 'Tankers (Hidden +6)': tankers_count += 1
-                break
-        
-        if not is_mil and region == 'Iran':
-            civ_count += 1
-
-    prev_civ = state.get('civ_iran', 0)
-    prev_mil = state.get('mil_reg', 0)
-    civ_diff = ((civ_count - prev_civ) / prev_civ * 100) if prev_civ > 0 else 0
-    mil_diff = ((mil_total - prev_mil) / prev_mil * 100) if prev_mil > 0 else 0
-    hidden_fighters = tankers_count * 6
-
-    # ЛОГИКА ОЦЕНКИ
-    level = "GREEN"
-    if civ_count <= 2: level = "RED"
-    elif civ_diff <= -30: level = "RED"
-    elif mil_diff >= 15 or tankers_count >= 3: level = "BLUE"
-
-    # СБОРКА ОТЧЕТА
-    report = f"🇮🇷 **REGULAR AVIATION:**\n• Above Iran: {civ_count} planes ({civ_diff:+.1f}%)\n\n"
-    
-    report += f"🌍 **MILITARY AVIATION ({mil_diff:+.1f}%):**\n"
-    for group, regions in mil_data.items():
-        loc_str = ", ".join([f"{count} in {reg}" for reg, count in regions.items()]) if regions else "none"
-        report += f"• {group}: {loc_str}\n"
-    
-    if hidden_fighters > 0:
-        report += f"• **Est. hidden fighters: +{hidden_fighters}**\n\n"
-
-    report += f"📰 **NEWS STATUS:**\n"
-    report += "\n".join([f"• {c}: {s}" for c, s in news_status.items()]) + "\n"
-
-    state.update({"civ_iran": civ_count, "mil_reg": mil_total, "news_hashes": updated_hashes})
-    with open(STATE_FILE, "w") as f: json.dump(state, f)
-    send_tg(report, level=level)
+        for
