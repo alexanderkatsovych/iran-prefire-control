@@ -1,28 +1,39 @@
 name: Airspace Monitor
+
 on:
   schedule:
-    - cron: '*/15 * * * *'
-  workflow_dispatch: # Позволяет запустить вручную кнопкой
+    - cron: '*/15 * * * *'  # Запуск каждые 15 минут
+  workflow_dispatch:        # Позволяет запускать бота вручную кнопкой в GitHub
+
 jobs:
   run-monitor:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # РАЗРЕШЕНИЕ НА ЗАПИСЬ (ОБЯЗАТЕЛЬНО)
+      contents: write       # РАЗРЕШЕНИЕ НА ЗАПИСЬ: необходимо для обновления state.json
+
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3  # Загружает код вашего репозитория
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
-      - run: pip install -r requirements.txt
+          python-version: '3.9'    # Устанавливает Python 3.9
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt  # Устанавливает requests и bs4
+
       - name: Run Analysis
         env:
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        run: python main.py
-      - name: Commit State
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}      # Берет токен из Secrets вашего репозитория
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}  # Берет ID чата из Secrets
+        run: python main.py                      # Запускает основной скрипт
+
+      - name: Commit and Push State
         run: |
           git config --global user.name "Airspace-Bot"
           git config --global user.email "bot@github.com"
-          git add state.json
-          git commit -m "Update state" || echo "No changes"
-          git push
+          git add state.json                     # Добавляет обновленный файл состояния
+          git commit -m "Update state: $(date)" || echo "No changes to commit"
+          git push                               # Сохраняет изменения в репозиторий
