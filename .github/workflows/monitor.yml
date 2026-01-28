@@ -1,39 +1,38 @@
-name: Airspace Monitor
+[cite_start]name: Airspace Monitor [cite: 1]
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # Запуск каждые 15 минут
-  workflow_dispatch:        # Позволяет запускать бота вручную кнопкой в GitHub
+    - [cite_start]cron: '*/15 * * * *'  # Запуск каждые 15 минут 
+  [cite_start]workflow_dispatch:        # Позволяет запускать мониторинг вручную через вкладку Actions 
 
 jobs:
   run-monitor:
-    runs-on: ubuntu-latest
+    [cite_start]runs-on: ubuntu-latest [cite: 1]
     permissions:
-      contents: write       # РАЗРЕШЕНИЕ НА ЗАПИСЬ: необходимо для обновления state.json
+      [cite_start]contents: write       # Обязательное разрешение для записи обновлений в state.json 
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3  # Загружает код вашего репозитория
+        [cite_start]uses: actions/checkout@v3 [cite: 1]
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        [cite_start]uses: actions/setup-python@v4 [cite: 1]
         with:
-          python-version: '3.9'    # Устанавливает Python 3.9
+          [cite_start]python-version: '3.9' [cite: 1]
 
       - name: Install Dependencies
-        run: |
-          pip install -r requirements.txt  # Устанавливает requests и bs4
+        [cite_start]run: pip install -r requirements.txt [cite: 1]
 
       - name: Run Analysis
         env:
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}      # Берет токен из Secrets вашего репозитория
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}  # Берет ID чата из Secrets
-        run: python main.py                      # Запускает основной скрипт
+          [cite_start]TG_TOKEN: ${{ secrets.TG_TOKEN }}      # Токен вашего Telegram-бота из настроек репозитория 
+          [cite_start]TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}  # ID вашего чата из настроек репозитория 
+        [cite_start]run: python main.py [cite: 1]
 
-      - name: Commit and Push State
+      - name: Commit State
         run: |
-          git config --global user.name "Airspace-Bot"
-          git config --global user.email "bot@github.com"
-          git add state.json                     # Добавляет обновленный файл состояния
-          git commit -m "Update state: $(date)" || echo "No changes to commit"
-          git push                               # Сохраняет изменения в репозиторий
+          git config --global user.name "Airspace-Bot" 
+          git config --global user.email "bot@github.com" 
+          git add state.json 
+          git commit -m "Update state: $(date)" || echo "No changes to commit" 
+          git push
