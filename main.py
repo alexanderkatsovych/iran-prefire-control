@@ -16,13 +16,14 @@ REGIONS = {
 
 STRATEGIC_BOUNDS = {'lamin': -10.0, 'lomin': 33.0, 'lamax': 45.0, 'lomax': 75.0}
 
+# Расширенные группы: добавили иранские военные префиксы
 MIL_GROUPS = {
-    'Tankers / Заправщики': ['LAGR', 'QUID', 'GOLD', 'K35R', 'TKRR', 'NACHO'],
+    'Tankers / Заправщики': ['LAGR', 'QUID', 'GOLD', 'K35R', 'TKRR', 'NACHO', 'IRAF'],
     'Strategic Bombers / Бомбардировщики': ['DEATH', 'MYSTIC', 'REAPER', 'FURY', 'BONE', 'DARK', 'MYTEE', 'DOOM', 'SKULL'],
     'Intelligence/UAV / Разведка/БПЛА': ['FORTE', 'MQ9', 'GHAWK', 'VEXL', 'HAWK', 'JAKE'],
     'Helicopters/SOF / Вертолеты/Спецназ': ['STALK', 'DUST', 'EVAC', 'MOJO', 'COWBOY', 'HUEY', 'KNIFE'],
-    'Transport/Cargo / Транспорт/Грузовые': ['RCH', 'C130', 'C17', 'C5', 'CN235'],
-    'Fighters/Strike / Истребители/Штурмовики': ['VIPER', 'DUKE', 'BOLT', 'F15', 'F16', 'F35', 'NIGHT', 'SHUCK', 'TABOR']
+    'Transport/Cargo / Транспорт/Грузовые': ['RCH', 'C130', 'C17', 'C5', 'CN235', 'SAHA', 'POUYA', 'FARS', 'IRGC'],
+    'Fighters/Strike / Истребители/Штурмовики': ['VIPER', 'DUKE', 'BOLT', 'F15', 'F16', 'F35', 'NIGHT', 'SHUCK', 'TABOR', 'IRAF', 'MERAJ']
 }
 
 STATE_FILE = "state.json"
@@ -50,7 +51,6 @@ if __name__ == "__main__":
     except: states = []
 
     civ_count, tankers_count = 0, 0
-    # Инициализируем все регионы и группы, чтобы они всегда были в отчете
     mil_by_region = {reg: {group: [] for group in MIL_GROUPS} for reg in REGIONS}
 
     for s in states:
@@ -68,7 +68,7 @@ if __name__ == "__main__":
             
             if not is_mil and region == 'Iran / Иран': civ_count += 1
 
-    # Расчет динамики
+    # Динамика
     prev_civ, prev_mil = state.get('civ_iran', 0), state.get('mil_reg', 0)
     civ_diff = ((civ_count - prev_civ) / prev_civ * 100) if prev_civ > 0 else 0
     mil_total_now = sum(len(calls) for reg in mil_by_region.values() for calls in reg.values())
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     
     level = "GREEN"
     reasons = []
-    if civ_count <= 2 or civ_diff <= -30:
+    if civ_count <= 2 or (civ_diff <= -30 and prev_civ > 10):
         level = "RED"
         reasons.append("🚨 TRAFFIC ANOMALY / АНОМАЛИЯ ТРАФИКА")
     elif mil_diff >= 15 or tankers_count >= 3:
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     report = f"🇮🇷 **REGULAR / ГРАЖДАНСКИЕ:**\n• Iran / Иран: {civ_count} ({civ_diff:+.1f}%)\n\n"
     report += f"⚔️ **MILITARY / ВОЕННЫЕ ({mil_diff:+.1f}%):**\n"
     
-    # Теперь выводим ВСЕ регионы из конфига, даже пустые
+    # Все регионы и группы всегда видны (чек-лист)
     for reg in REGIONS.keys():
         groups = mil_by_region[reg]
         report += f"📍 **{reg}**\n"
