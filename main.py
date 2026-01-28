@@ -81,4 +81,50 @@ if __name__ == "__main__":
         callsign, lon, lat = (s[1] or "").strip().upper(), s[5], s[6]
         region = get_region(lat, lon)
         is_mil = False
-        for
+        for group, tags in MIL_GROUPS.items():
+            if any(t in callsign for t in tags):
+                mil_data[group][region] = mil_data[group].get(region, 0) + 1
+                mil_total += 1
+                is_mil = True
+                if group == 'Tankers (Hidden +6)': tankers_count += 1
+                break
+        if not is_mil and region == 'Iran': civ_count += 1
+
+    prev_civ, prev_mil = state.get('civ_iran', 0), state.get('mil_reg', 0)
+    civ_diff = ((civ_count - prev_civ) / prev_civ * 100) if prev_civ > 0 else 0
+    mil_total_real = sum(sum(r.values()) for r in mil_data.values())
+    mil_diff = ((mil_total_real - prev_mil) / prev_mil * 100) if prev_mil > 0 else 0
+    hidden_fighters = tankers_count * 6
+
+    level = "GREEN"
+    reasons = []
+    if civ_count <= 2: 
+        level = "RED"
+        reasons.append("🚨 CRITICAL: Empty sky (0-2 planes).")
+    elif civ_diff <= -30: 
+        level = "RED"
+        reasons.append(f"🚨 ALERT: Traffic collapse ({abs(civ_diff):.1f}%).")
+    elif mil_diff >= 15 or tankers_count >= 3: 
+        level = "BLUE"
+        reasons.append("⚠️ WARNING: High military activity.")
+
+    report = f"🇮🇷 **REGULAR AVIATION:**\n• Above Iran: {civ_count} planes ({civ_diff:+.1f}%)\n\n"
+    report += f"🌍 **MILITARY AVIATION ({mil_diff:+.1f}%):**\n"
+    for group, regions in mil_data.items():
+        loc_str = ", ".join([f"{count} in {reg}" for reg, count in regions.items()]) if regions else "none"
+        report += f"• {group}: {loc_str}\n"
+    if hidden_fighters > 0:
+        report += f"• **Est. hidden fighters: +{hidden_fighters}**\n\n"
+
+    report += f"📰 **NEWS STATUS:**\n"
+    for comp, data in news_status.items():
+        if data['status'] == "🆕 NEW UPDATE":
+            report += f"• [{comp}]({data['url']}): {data['status']}\n"
+        else:
+            report += f"• {comp}: {data['status']}\n"
+
+    if reasons: report += f"\n📋 **ANALYSIS:** " + " ".join(reasons)
+
+    state.update({"civ_iran": civ_count, "mil_reg": mil_total_real, "news_hashes": updated_hashes})
+    with open(STATE_FILE, "w") as f: json.dump(state, f)
+    send_tg(report, level=level)
