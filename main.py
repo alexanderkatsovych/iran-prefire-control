@@ -1,11 +1,9 @@
 import requests
 import os
 import json
-import hashlib
-from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
-# --- КОНФИГУРАЦИЯ (BILINGUAL REGIONS) ---
+# --- КОНФИГУРАЦИЯ ЗОН / REGIONS CONFIG ---
 REGIONS = {
     'Iran / Иран': {'lamin': 24.0, 'lomin': 44.0, 'lamax': 40.0, 'lomax': 63.0},
     'Israel / Израиль': {'lamin': 29.5, 'lomin': 34.2, 'lamax': 33.3, 'lomax': 35.9},
@@ -18,24 +16,15 @@ REGIONS = {
 
 STRATEGIC_BOUNDS = {'lamin': -10.0, 'lomin': 33.0, 'lamax': 45.0, 'lomax': 75.0}
 
-# --- КОНФИГУРАЦИЯ (BILINGUAL MIL GROUPS) ---
+# --- ВОЕННЫЕ ГРУППЫ / MILITARY GROUPS ---
 MIL_GROUPS = {
-    'Tankers (Hidden +6) / Заправщики (+6 истреб.)': ['LAGR', 'QUID', 'GOLD', 'K35R', 'TKRR', 'NACHO'],
-    'Strategic Bombers / Стратег. бомбардировщики': ['DEATH', 'MYSTIC', 'REAPER', 'FURY', 'BONE', 'DARK', 'MYTEE', 'DOOM', 'SKULL'],
+    'Tankers / Заправщики': ['LAGR', 'QUID', 'GOLD', 'K35R', 'TKRR', 'NACHO'],
+    'Strategic Bombers / Бомбардировщики': ['DEATH', 'MYSTIC', 'REAPER', 'FURY', 'BONE', 'DARK', 'MYTEE', 'DOOM', 'SKULL'],
     'Intelligence/UAV / Разведка/БПЛА': ['FORTE', 'MQ9', 'GHAWK', 'VEXL', 'HAWK', 'JAKE'],
     'Helicopters/SOF / Вертолеты/Спецназ': ['STALK', 'DUST', 'EVAC', 'MOJO', 'COWBOY', 'HUEY', 'KNIFE'],
     'Transport/Cargo / Транспорт/Грузовые': ['RCH', 'C130', 'C17', 'C5', 'CN235', 'CNTRL'],
     'Fighters/Strike / Истребители/Штурмовики': ['VIPER', 'DUKE', 'BOLT', 'F15', 'F16', 'F35', 'NIGHT', 'SHUCK', 'TABOR']
 }
-
-NEWS_SOURCES = {
-    'Emirates': 'https://www.emirates.com/english/help/travel-updates/',
-    'flydubai': 'https://www.flydubai.com/en/contact/operational-updates',
-    'Jazeera': 'https://www.jazeeraairways.com/en-kw/media-centre'
-}
-
-LOC_KEYWORDS = ['iran', 'tehran', 'teheran', 'israel', 'tel aviv']
-ACT_KEYWORDS = ['suspended', 'canceled', 'cancelled', 'stop', 'interrupted', 'avoid', 'temporary']
 
 STATE_FILE = "state.json"
 
@@ -45,113 +34,93 @@ def get_region(lat, lon):
             return name
     return "Other/Intl / Другие"
 
-def get_news_updates(old_hashes):
-    updates, new_hashes = {}, {}
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-    }
-    for name, url in NEWS_SOURCES.items():
-        try:
-            res = requests.get(url, headers=headers, timeout=20)
-            if res.status_code == 200:
-                soup = BeautifulSoup(res.text, 'html.parser')
-                for s in soup(["script", "style"]): s.decompose()
-                clean_text = soup.get_text().lower()
-                
-                has_loc = any(loc in clean_text for loc in LOC_KEYWORDS)
-                has_act = any(act in clean_text for act in ACT_KEYWORDS)
-                
-                if has_loc and has_act:
-                    h = hashlib.md5(clean_text.encode()).hexdigest()
-                    new_hashes[name] = h
-                    if old_hashes.get(name) != h:
-                        updates[name] = {"status": "🆕 RELEVANT UPDATE / ВАЖНОЕ ОБНОВЛЕНИЕ", "url": url}
-                    else:
-                        updates[name] = {"status": "checked: no changes / проверено: без изменений", "url": url}
-                else:
-                    new_hashes[name] = old_hashes.get(name)
-                    updates[name] = {"status": "no relevant news / нет важных новостей", "url": url}
-            else:
-                updates[name] = {"status": f"access issue / ошибка доступа ({res.status_code})", "url": url}
-                new_hashes[name] = old_hashes.get(name)
-        except:
-            updates[name] = {"status": "connection error / ошибка связи", "url": url}
-            new_hashes[name] = old_hashes.get(name)
-    return updates, new_hashes
-
 def send_tg(message, level="INFO"):
     token, chat_id = os.environ.get('TG_TOKEN'), os.environ.get('TG_CHAT_ID')
-    icons = {"RED": "🔴 RED ALERT / КРИТИЧЕСКИЙ УРОВЕНЬ", "BLUE": "🔵 BLUE STATUS / ВНИМАНИЕ", "GREEN": "🟢 GREEN STATUS / НОРМА"}
+    icons = {
+        "RED": "🔴 RED ALERT / КРИТИЧЕСКИЙ УРОВЕНЬ",
+        "BLUE": "🔵 BLUE STATUS / ВНИМАНИЕ",
+        "GREEN": "🟢 GREEN STATUS / НОРМА"
+    }
     msg = f"{icons.get(level, '🔍')}\n\n{message}\n\n🕒 _UTC: {datetime.now(timezone.utc).strftime('%H:%M:%S')}_"
     requests.post(f"https://api.telegram.org/bot{token}/sendMessage", 
-                  data={'chat_id': chat_id, 'text': msg, 'parse_mode': 'Markdown', 'disable_web_page_preview': False})
+                  data={'chat_id': chat_id, 'text': msg, 'parse_mode': 'Markdown'})
 
 if __name__ == "__main__":
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, "r") as f: state = json.load(f)
-    else: state = {"civ_iran": 0, "mil_reg": 0, "news_hashes": {}}
+    else: state = {"civ_iran": 0, "mil_reg": 0}
 
-    news_status, updated_hashes = get_news_updates(state.get('news_hashes', {}))
-    
     try:
         r = requests.get("https://opensky-network.org/api/states/all", params=STRATEGIC_BOUNDS, timeout=25)
         states = r.json().get('states', []) or []
     except: states = []
 
-    civ_count, mil_total, tankers_count = 0, 0, 0
-    mil_data = {group: {} for group in MIL_GROUPS}
+    civ_count, tankers_count = 0, 0
+    # mil_structure: { Group: { Region: [Callsigns] } }
+    mil_structure = {group: {} for group in MIL_GROUPS}
 
     for s in states:
         callsign, lon, lat = (s[1] or "").strip().upper(), s[5], s[6]
         region = get_region(lat, lon)
         is_mil = False
+        
         for group, tags in MIL_GROUPS.items():
             if any(t in callsign for t in tags):
-                mil_data[group][region] = mil_data[group].get(region, 0) + 1
-                mil_total += 1
+                if region not in mil_structure[group]:
+                    mil_structure[group][region] = []
+                mil_structure[group][region].append(callsign)
                 is_mil = True
-                if group == 'Tankers (Hidden +6) / Заправщики (+6 истреб.)': tankers_count += 1
+                if group == 'Tankers / Заправщики': tankers_count += 1
                 break
-        if not is_mil and region == 'Iran / Иран': civ_count += 1
+        
+        if not is_mil and region == 'Iran / Иран':
+            civ_count += 1
 
-    prev_civ, prev_mil = state.get('civ_iran', 0), state.get('mil_reg', 0)
+    # Анализ динамики
+    prev_civ = state.get('civ_iran', 0)
     civ_diff = ((civ_count - prev_civ) / prev_civ * 100) if prev_civ > 0 else 0
-    mil_total_real = sum(sum(r.values()) for r in mil_data.values())
-    mil_diff = ((mil_total_real - prev_mil) / prev_mil * 100) if prev_mil > 0 else 0
+    mil_total_now = sum(len(calls) for g in mil_structure.values() for calls in g.values())
+    prev_mil = state.get('mil_reg', 0)
+    mil_diff = ((mil_total_now - prev_mil) / prev_mil * 100) if prev_mil > 0 else 0
     hidden_fighters = tankers_count * 6
 
+    # Уровни угрозы
     level = "GREEN"
     reasons = []
-    if civ_count <= 2: 
+    if civ_count <= 2:
         level = "RED"
         reasons.append("🚨 EMPTY SKY / НЕБО ПУСТО (0-2)")
-    elif civ_diff <= -30: 
+    elif civ_diff <= -30:
         level = "RED"
         reasons.append(f"🚨 TRAFFIC COLLAPSE / ОБВАЛ ТРАФИКА ({abs(civ_diff):.1f}%)")
-    elif mil_diff >= 15 or tankers_count >= 3: 
+    elif mil_diff >= 15 or tankers_count >= 3:
         level = "BLUE"
         reasons.append("⚠️ HIGH MIL ACTIVITY / АКТИВНОСТЬ ВВС")
 
-    report = "🇮🇷 **REGULAR AVIATION / ГРАЖДАНСКИЕ:**\n"
+    # Сборка отчета
+    report = "🇮🇷 **REGULAR / ГРАЖДАНСКИЕ:**\n"
     report += f"• Iran / Иран: {civ_count} ({civ_diff:+.1f}%)\n\n"
-    report += f"🌍 **MILITARY / ВОЕННЫЕ ({mil_diff:+.1f}%):**\n"
-    for group, regions in mil_data.items():
-        loc_str = ", ".join([f"{count} in {reg}" for reg, count in regions.items()]) if regions else "none"
-        report += f"• {group}: {loc_str}\n"
+    
+    report += f"⚔️ **MILITARY / ВОЕННЫЕ ({mil_diff:+.1f}%):**\n"
+    found_mil = False
+    for group, regions in mil_structure.items():
+        if not regions: continue
+        found_mil = True
+        report += f"• **{group}**\n"
+        for reg, calls in regions.items():
+            calls_str = ", ".join(calls)
+            report += f"  └ 📍 {reg}: {len(calls)} ✈️ ({calls_str})\n"
+    
+    if not found_mil:
+        report += "• No military aircraft detected / Военных бортов не обнаружено\n"
+    
     if hidden_fighters > 0:
-        report += f"• **Est. hidden fighters / Скрытые истребители: +{hidden_fighters}**\n\n"
-
-    report += f"📰 **NEWS / НОВОСТИ:**\n"
-    for comp, data in news_status.items():
-        if "RELEVANT" in data['status']:
-            report += f"• [{comp}]({data['url']}): {data['status']}\n"
-        else:
-            report += f"• {comp}: {data['status']}\n"
+        report += f"\n• **Est. hidden fighters / Скрытые истребители: +{hidden_fighters}**\n"
 
     if reasons:
         report += f"\n📋 **ANALYSIS / АНАЛИЗ:**\n" + "\n".join([f"• {r}" for r in reasons])
 
-    state.update({"civ_iran": civ_count, "mil_reg": mil_total_real, "news_hashes": updated_hashes})
+    # Сохранение и отправка
+    state.update({"civ_iran": civ_count, "mil_reg": mil_total_now})
     with open(STATE_FILE, "w") as f: json.dump(state, f)
     send_tg(report, level=level)
