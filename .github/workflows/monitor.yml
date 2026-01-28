@@ -2,27 +2,27 @@ name: Airspace Monitor
 on:
   schedule:
     - cron: '*/15 * * * *'
-  workflow_dispatch:
+  workflow_dispatch: # Позволяет запустить вручную кнопкой
 jobs:
   run-monitor:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # РАЗРЕШЕНИЕ НА ЗАПИСЬ (ОБЯЗАТЕЛЬНО)
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - run: pip install -r requirements.txt
-      - name: Run Script
+      - name: Run Analysis
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: python main.py
-      - name: Save State
+      - name: Commit State
         run: |
           git config --global user.name "Airspace-Bot"
           git config --global user.email "bot@github.com"
           git add state.json
-          git commit -m "Update strategic state" || echo "No changes"
+          git commit -m "Update state" || echo "No changes"
           git push
