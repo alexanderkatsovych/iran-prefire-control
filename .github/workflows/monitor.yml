@@ -1,38 +1,38 @@
-[cite_start]name: Airspace Monitor [cite: 1]
+name: Airspace Monitor
 
 on:
   schedule:
-    - [cite_start]cron: '*/15 * * * *'  # Запуск каждые 15 минут 
-  [cite_start]workflow_dispatch:        # Позволяет запускать мониторинг вручную через вкладку Actions 
+    - cron: '*/15 * * * *'  # Запуск каждые 15 минут
+  workflow_dispatch:        # Позволяет запускать мониторинг вручную
 
 jobs:
   run-monitor:
-    [cite_start]runs-on: ubuntu-latest [cite: 1]
+    runs-on: ubuntu-latest
     permissions:
-      [cite_start]contents: write       # Обязательное разрешение для записи обновлений в state.json 
+      contents: write       # Разрешение на запись для обновления state.json
 
     steps:
       - name: Checkout Code
-        [cite_start]uses: actions/checkout@v3 [cite: 1]
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        [cite_start]uses: actions/setup-python@v4 [cite: 1]
+        uses: actions/setup-python@v4
         with:
-          [cite_start]python-version: '3.9' [cite: 1]
+          python-version: '3.9'
 
       - name: Install Dependencies
-        [cite_start]run: pip install -r requirements.txt [cite: 1]
+        run: pip install -r requirements.txt
 
       - name: Run Analysis
         env:
-          [cite_start]TG_TOKEN: ${{ secrets.TG_TOKEN }}      # Токен вашего Telegram-бота из настроек репозитория 
-          [cite_start]TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}  # ID вашего чата из настроек репозитория 
-        [cite_start]run: python main.py [cite: 1]
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}      # Секрет с токеном бота
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}  # Секрет с ID чата
+        run: python main.py
 
       - name: Commit State
         run: |
-          git config --global user.name "Airspace-Bot" 
-          git config --global user.email "bot@github.com" 
-          git add state.json 
-          git commit -m "Update state: $(date)" || echo "No changes to commit" 
+          git config --global user.name "Airspace-Bot"
+          git config --global user.email "bot@github.com"
+          git add state.json
+          git commit -m "Update state: $(date)" || echo "No changes to commit"
           git push
