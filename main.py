@@ -2,6 +2,7 @@ import requests
 import os
 import json
 import hashlib
+from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
 # --- КОНФИГУРАЦИЯ ---
@@ -42,25 +43,44 @@ def get_region(lat, lon):
 
 def get_news_updates(old_hashes):
     updates, new_hashes = {}, {}
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    # Расширенные заголовки для обхода простых блокировок (как у flydubai) 
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.google.com/'
+    }
     for name, url in NEWS_SOURCES.items():
         try:
-            res = requests.get(url, headers=headers, timeout=15)
-            h = hashlib.md5(res.text.encode()).hexdigest()
-            new_hashes[name] = h
-            status_text = "🆕 NEW UPDATE" if old_hashes.get(name) != h else "no updates"
-            updates[name] = {"status": status_text, "url": url}
-        except:
-            updates[name] = {"status": "error", "url": url}
+            res = requests.get(url, headers=headers, timeout=20)
+            if res.status_code == 200:
+                # Используем BeautifulSoup для извлечения только видимого текста 
+                soup = BeautifulSoup(res.text, 'html.parser')
+                # Удаляем скрипты и стили, которые создают "шум" 
+                for script in soup(["script", "style"]):
+                    script.decompose()
+                clean_text = soup.get_text()
+                
+                h = hashlib.md5(clean_text.encode()).hexdigest()
+                new_hashes[name] = h
+                status_text = "🆕 NEW UPDATE / НОВОЕ ОБНОВЛЕНИЕ" if old_hashes.get(name) != h else "no updates / нет новостей"
+                updates[name] = {"status": status_text, "url": url}
+            elif res.status_code == 403:
+                updates[name] = {"status": "protected/no access", "url": url}
+                new_hashes[name] = old_hashes.get(name)
+            else:
+                updates[name] = {"status": f"code {res.status_code}", "url": url}
+                new_hashes[name] = old_hashes.get(name)
+        except Exception as e:
+            updates[name] = {"status": "connection issue", "url": url}
             new_hashes[name] = old_hashes.get(name)
     return updates, new_hashes
 
 def send_tg(message, level="INFO"):
     token, chat_id = os.environ.get('TG_TOKEN'), os.environ.get('TG_CHAT_ID')
-    icons = {"RED": "🔴 RED ALERT", "BLUE": "🔵 BLUE STATUS", "GREEN": "🟢 GREEN STATUS"}
+    icons = {"RED": "🔴 RED ALERT / КРИТИЧЕСКИЙ УРОВЕНЬ", "BLUE": "🔵 BLUE STATUS / ВНИМАНИЕ", "GREEN": "🟢 GREEN STATUS / НОРМА"}
     msg = f"{icons.get(level, '🔍')}\n\n{message}\n\n🕒 _UTC: {datetime.now(timezone.utc).strftime('%H:%M:%S')}_"
     requests.post(f"https://api.telegram.org/bot{token}/sendMessage", 
-                  data={'chat_id': chat_id, 'text': msg, 'parse_mode': 'Markdown'})
+                  data={'chat_id': chat_id, 'text': msg, 'parse_mode': 'Markdown', 'disable_web_page_preview': False})
 
 if __name__ == "__main__":
     if os.path.exists(STATE_FILE):
@@ -96,35 +116,42 @@ if __name__ == "__main__":
     mil_diff = ((mil_total_real - prev_mil) / prev_mil * 100) if prev_mil > 0 else 0
     hidden_fighters = tankers_count * 6
 
+    # ЛОГИКА ОЦЕНКИ
     level = "GREEN"
     reasons = []
     if civ_count <= 2: 
         level = "RED"
-        reasons.append("🚨 CRITICAL: Empty sky (0-2 planes).")
+        reasons.append("🚨 EMPTY SKY / НЕБО ПУСТО (0-2)")
     elif civ_diff <= -30: 
         level = "RED"
-        reasons.append(f"🚨 ALERT: Traffic collapse ({abs(civ_diff):.1f}%).")
+        reasons.append(f"🚨 TRAFFIC COLLAPSE / ОБВАЛ ТРАФИКА ({abs(civ_diff):.1f}%)")
     elif mil_diff >= 15 or tankers_count >= 3: 
         level = "BLUE"
-        reasons.append("⚠️ WARNING: High military activity.")
+        reasons.append("⚠️ HIGH MIL ACTIVITY / АКТИВНОСТЬ ВВС")
 
-    report = f"🇮🇷 **REGULAR AVIATION:**\n• Above Iran: {civ_count} planes ({civ_diff:+.1f}%)\n\n"
-    report += f"🌍 **MILITARY AVIATION ({mil_diff:+.1f}%):**\n"
+    # СБОРКА ОТЧЕТА (Bilingual) 
+    report = "🇮🇷 **REGULAR AVIATION / ГРАЖДАНСКИЕ:**\n"
+    report += f"• Iran/Иран: {civ_count} ({civ_diff:+.1f}%)\n\n"
+    
+    report += f"🌍 **MILITARY / ВОЕННЫЕ ({mil_diff:+.1f}%):**\n"
     for group, regions in mil_data.items():
         loc_str = ", ".join([f"{count} in {reg}" for reg, count in regions.items()]) if regions else "none"
         report += f"• {group}: {loc_str}\n"
+    
     if hidden_fighters > 0:
-        report += f"• **Est. hidden fighters: +{hidden_fighters}**\n\n"
+        report += f"• **Est. hidden fighters / Скрытые истребители: +{hidden_fighters}**\n\n"
 
-    report += f"📰 **NEWS STATUS:**\n"
+    report += f"📰 **NEWS / НОВОСТИ:**\n"
     for comp, data in news_status.items():
-        if data['status'] == "🆕 NEW UPDATE":
+        if "NEW UPDATE" in data['status']:
             report += f"• [{comp}]({data['url']}): {data['status']}\n"
         else:
             report += f"• {comp}: {data['status']}\n"
 
-    if reasons: report += f"\n📋 **ANALYSIS:** " + " ".join(reasons)
+    if reasons:
+        report += f"\n📋 **ANALYSIS / АНАЛИЗ:**\n" + "\n".join([f"• {r}" for r in reasons])
 
+    # Сохранение и отправка
     state.update({"civ_iran": civ_count, "mil_reg": mil_total_real, "news_hashes": updated_hashes})
     with open(STATE_FILE, "w") as f: json.dump(state, f)
     send_tg(report, level=level)
