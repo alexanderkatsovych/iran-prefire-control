@@ -6,13 +6,23 @@ on:
 jobs:
   run-monitor:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - run: pip install -r requirements.txt
-      - run: python main.py
+      - name: Run Script
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: python main.py
+      - name: Save State
+        run: |
+          git config --global user.name "Airspace-Bot"
+          git config --global user.email "bot@github.com"
+          git add state.json
+          git commit -m "Update strategic state" || echo "No changes"
+          git push
