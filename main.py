@@ -1,17 +1,11 @@
-import requests
-import os
+
 import json
 from datetime import datetime, timezone
 
 # --- CONFIGURATION (BILINGUAL) ---
 REGIONS = {
     'Iran / Иран': {'lamin': 24.0, 'lomin': 44.0, 'lamax': 40.0, 'lomax': 63.0},
-    'Israel / Израиль': {'lamin': 29.5, 'lomin': 34.2, 'lamax': 33.3, 'lomax': 35.9},
-    'Iraq / Ирак': {'lamin': 29.0, 'lomin': 38.0, 'lamax': 37.5, 'lomax': 48.5},
-    'Jordan / Иордания': {'lamin': 29.0, 'lomin': 35.0, 'lamax': 33.0, 'lomax': 39.0},
-    'Qatar / Катар': {'lamin': 24.2, 'lomin': 50.4, 'lamax': 26.6, 'lomax': 51.7},
-    'Gulf of Aden / Аденский залив': {'lamin': 10.0, 'lomin': 43.0, 'lamax': 15.0, 'lomax': 51.0},
-    'Diego Garcia / Диего-Гарсия': {'lamin': -8.0, 'lomin': 71.0, 'lamax': -6.0, 'lomax': 73.0}
+    'Israel / Израиль': {'lamin': 29.5, 'lomin': 34.2, 'lamax': 33.3, 'lomax': 35.9},'Diego Garcia / Диего-Гарсия': {'lamin': -8.0, 'lomin': 71.0, 'lamax': -6.0, 'lomax': 73.0}
 }
 
 STRATEGIC_BOUNDS = {'lamin': -10.0, 'lomin': 33.0, 'lamax': 45.0, 'lomax': 75.0}
